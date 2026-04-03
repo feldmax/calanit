@@ -1,0 +1,35 @@
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs (keep structure, ignore content in some cases)
+# logs/ folder is tracked, but we can ignore specific temp files if needed
+
+# Dependencies (if we add npm later)
+node_modules/
+package-lock.json
+
+# Build outputs (future)
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.log
+.cache/
+
+# Sensitive data
+config.local.js
+secrets.json
+credentials.json
+
+# Claude Code temporary files
+.claude/
