@@ -1,0 +1,25 @@
+{
+  "date": "2026-04-05",
+  "sessions": [
+    {
+      "session_id": "session-2026-04-05-211553-sonnet",
+      "model": "sonnet",
+      "model_full_name": "claude-4.5-sonnet",
+      "start_time": "2026-04-05T21:15:53+03:00",
+      "input_tokens": 52245,
+      "output_tokens": 12100,
+      "total_tokens": 64345,
+      "estimated_cost_usd": 0.193,
+      "notes": "Restructured Google Sheets data model, updated documentation, created sample data"
+    }
+  ],
+  "daily_total_tokens": 64345,
+  "daily_total_cost_usd": 0.193,
+  "pricing_reference": {
+    "sonnet": {
+      "input_per_mtok": 3.0,
+      "output_per_mtok": 15.0
+    },
+    "note": "Pricing as of April 2026, Claude 4.5 Sonnet"
+  }
+}
