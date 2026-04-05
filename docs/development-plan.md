@@ -7,14 +7,24 @@ MVP web application for short-term parking space rental between neighbors in a 3
 ## Core Requirements
 
 ### Scope
-- 36 apartments
+- 36 apartments across 1-2 buildings
 - Each apartment: 1 storage room + 1-2 parking spaces
-- 2-3 common parking spaces (building-owned)
+- 2-4 common parking spaces (building-owned)
 - **MVP Focus**: Parking only (storage rooms - future phase)
-- Rental types:
-  - **Hourly**: 1 hour min, 24 hours max
-  - **Daily**: 1 day min, 1 month max
-  - **Monthly**: 1 month min, 1 year max
+- **5 Parking Types**:
+  - Regular (majority)
+  - Limited access (harder to park, e.g., last in row)
+  - Premium (better access)
+  - Disabled (expanded space)
+  - Linked (tandem pairs - must book together)
+- **Rental Model**:
+  - **Hourly slots only**: 1 hour minimum, 48 hours maximum
+  - No daily/monthly options for MVP
+  - Bookings must start/end at exact hour marks (e.g., 14:00, 15:00)
+- **Booking Rules**:
+  - Auto-block overlapping bookings
+  - Max 2 parking spaces per person simultaneously
+  - Linked parking pairs must be booked together
 
 ### User Roles
 1. **Administrator** (building manager)
@@ -53,44 +63,47 @@ MVP web application for short-term parking space rental between neighbors in a 3
 - **API**: Google Apps Script deployed as web app
 - **Authentication**: Phone number validation via Apps Script
 
-### Data Model (preliminary)
+### Data Model
 
-**Sheet 1: Apartments**
-- apartment_number
-- owner_name_1, owner_phone_1
-- owner_name_2, owner_phone_2
-- tenant_name_1, tenant_phone_1
-- tenant_name_2, tenant_phone_2
-- lease_start_date
-- lease_end_date
+**Admin Tables (manual entry):**
 
-**Sheet 2: Parking Spaces**
-- parking_number
-- apartment_number (owner)
-- type (private/common)
-- current_holder_phone (owner or tenant)
+**Table 1: Parking**
+- parking_number, type (5 types), linked_parking_number
+- ownership (private/common), street_address
+- location_description, status, notes
 
-**Sheet 3: Storage Rooms**
-- storage_number
-- apartment_number (owner)
-- current_holder_phone
+**Table 2: Owners**
+- owner_id, first_name, family_name, phone, email
+- street_address, apartment (can be multiple)
+- storage, parking_spaces (comma-separated)
+- is_resident (TRUE if lives there)
 
-**Sheet 4: Availability**
-- resource_id (parking_number or storage_number)
-- resource_type (parking/storage)
-- available_from (datetime)
-- available_to (datetime)
-- rental_type (hourly/daily/monthly)
-- owner_phone
+**Table 3: Tenants**
+- tenant_id, first_name, family_name, phone, email
+- street_address, apartment, storage, parking_spaces
+- rent_from, rent_until (datetime)
 
-**Sheet 5: Bookings**
-- booking_id
-- resource_id
-- resource_type
-- renter_phone
-- booking_start
-- booking_end
-- status (pending/confirmed/cancelled)
+**Table 4: Holders (auto-generated via formulas)**
+- holder_id, street_address_apartment, full_name
+- holder_type (owner/tenant), phone
+- storage, parking_spaces
+
+**Application Tables (managed by Apps Script):**
+
+**Table 5: Availability**
+- availability_id, resource_type, resource_number
+- owner_phone, available_from, available_to
+- status, created_at, updated_at
+
+**Table 6: Bookings**
+- booking_id, availability_id, resource_type, resource_number
+- renter_phone, renter_name, booking_start, booking_end
+- status, created_at, updated_at, cancelled_at, cancellation_reason
+
+**Table 7: Users_Registry (auto-synced from Owners/Tenants)**
+- phone, full_name, street_address, apartment
+- role (owner/tenant/admin), is_active
+- registered_at, last_login
 - created_at
 
 ## Development Phases
@@ -158,18 +171,18 @@ MVP web application for short-term parking space rental between neighbors in a 3
 - Automated reminders
 - Reviews/ratings
 
-## Open Questions ✅ RESOLVED
+## Open Questions ✅ ALL RESOLVED
 
 1. ✅ **UI Language**: English interface
 2. ✅ **Priority**: Parking only for MVP (storage rooms - future)
-3. **Google Sheets**: Should we create a template with sample data?
-4. ✅ **Phone validation**: Israeli format 050-1234567 (simple format check)
+3. ✅ **Google Sheets**: Sample data to be created with 2 buildings, 5 parking types
+4. ✅ **Phone validation**: Israeli format 050-1234567 or +972-50-1234567
 5. ✅ **Timezone**: Jerusalem (Asia/Jerusalem)
-6. ✅ **Booking limits**:
-   - Hourly: 1h - 24h
-   - Daily: 1 day - 1 month
-   - Monthly: 1 month - 1 year
-7. **Booking conflicts**: Auto-block or allow overbooking with manual resolution?
+6. ✅ **Booking model**: Hourly slots only (1h min - 48h max)
+7. ✅ **Booking conflicts**: Auto-block overlapping bookings
+8. ✅ **Booking limits**: Max 2 parking spaces per person simultaneously
+9. ✅ **Parking types**: 5 types including linked pairs (must book together)
+10. ✅ **Data structure**: Separate first_name/family_name, separate street_address/apartment
 
 ## Risk Assessment
 
