@@ -1,345 +1,147 @@
-# Google Sheets Data Model Specification
+# Google Sheets Data Model Specification — MVP
 
 ## Overview
 
-Database structure for Calanit parking management system using Google Sheets.
+Database structure for Calanit parking management system (MVP for single building).
+
+**Purpose**: Enable residents to rent parking spaces from each other short-term, free of charge, voluntarily.
+
+**Scope**: One residential building, hourly rental slots (1 hour minimum), private parking only.
 
 **Timezone**: All datetime fields use Jerusalem timezone (Asia/Jerusalem)
 **Phone Format**: Israeli mobile format `050-1234567` or `+972-50-1234567`
-**Date Format**: ISO 8601 with timezone: `2026-04-05T14:00:00+03:00`
 
 ---
 
-## Admin-Managed Tables
+## Tables Overview
 
-These tables are filled manually by the administrator.
+| Table     | Purpose                                | Managed By  |
+|-----------|----------------------------------------|-------------|
+| Parking   | List of all parking spaces             | Admin       |
+| Owners    | Apartment owners                       | Admin       |
+| Tenants   | Current tenants                        | Admin       |
+| Residents | Current residents (auto-generated)     | Auto-formula|
 
-### Table 1: Parking
+---
 
-Stores information about all parking spaces in the building(s).
+## Table 1: Parking
 
-| Column | Type | Required | Validation | Description | Example |
-|--------|------|----------|------------|-------------|---------|
-| parking_number | String | Yes | Unique, format P-XXX | Parking identifier | P-001 |
-| type | Enum | Yes | Dropdown list | Parking type (see below) | regular |
-| linked_parking_number | String | No | Must exist in Parking | For linked type only | P-002 |
-| ownership | Enum | Yes | Dropdown: private, common | Private or common | private |
-| street_address | String | Yes | | Building address | HaNassi 15 |
-| location_description | String | No | | Physical location details | Ground floor, section A |
-| status | Enum | Yes | Dropdown: active, maintenance | Operational status | active |
-| notes | String | No | | Additional notes | - |
+Stores information about all parking spaces in the building.
+
+| Column        | Type    | Required | Auto-Generated | Description                  | Example      |
+|---------------|---------|----------|----------------|------------------------------|--------------|
+| parking_id    | String  | Yes      | Yes            | Unique parking identifier    | P-001        |
+| type          | Enum    | Yes      | No             | Parking type                 | regular      |
+| linked_id     | String  | No       | No             | Linked tandem parking ID     | P-002        |
 
 **Parking Types** (dropdown values):
-1. `regular` - Standard parking space (majority)
-2. `limited_access` - Harder access (e.g., last in row near wall, harder for large cars)
-3. `premium` - Better access, more convenient
-4. `disabled` - Expanded space for disabled persons
-5. `linked` - Two spaces in tandem (one blocks another's exit)
+1. `regular` — Standard parking space (majority)
+2. `tandem` — Tandem parking (one car blocks another's exit, must be rented in pairs)
+3. `wheelchair` — Accessible parking space for wheelchair users
 
 **Validation Rules**:
-- `parking_number`: Unique across all buildings
-- `type`: Must be one of 5 types
-- `linked_parking_number`: Required if `type = linked`, must reference another parking with `type = linked`
-- Linked parking pairs must reference each other (P-001 → P-002, P-002 → P-001)
-- `ownership`: Either `private` (belongs to apartment) or `common` (building-owned)
-- `status`: Defaults to `active`
+- `parking_id`: Auto-generated (P-001, P-002, etc.), unique, read-only
+- `type`: Must be one of 3 types (dropdown)
+- `linked_id`: Required if `type = tandem`, must reference another parking with `type = tandem`
+- Tandem parking pairs must reference each other (P-001 → P-002, P-002 → P-001)
+
+**Data Validation Setup**:
+- Column B (type): Dropdown list with values: `regular, tandem, wheelchair`
+- Column C (linked_id): Dropdown from Parking!A:A (parking_id column)
 
 **Conditional Formatting**:
-- Linked parking: Highlight yellow
-- Common parking: Highlight light green
-- Maintenance: Highlight light red
+- Tandem parking: Highlight yellow when type = "tandem"
+- Wheelchair parking: Highlight light blue when type = "wheelchair"
 
 ---
 
-### Table 2: Owners
+## Table 2: Owners
 
 Stores information about apartment owners.
 
-| Column | Type | Required | Validation | Description | Example |
-|--------|------|----------|------------|-------------|---------|
-| owner_id | String | Yes | Auto: OWN-XXX | Unique owner identifier | OWN-001 |
-| first_name | String | Yes | | Owner's first name | David |
-| family_name | String | Yes | | Owner's family name | Cohen |
-| phone | String | Yes | Format validation | Israeli mobile number | 050-1234567 |
-| email | String | No | Email format | Email address | david@example.com |
-| street_address | String | Yes | | Building address | HaNassi 15 |
-| apartment | String | Yes | | Apartment number(s) | 5 or 5,12 |
-| storage | String | No | | Storage room number(s) | S-05 or S-05,S-12 |
-| parking_spaces | String | No | | Parking number(s) | P-005 or P-005,P-006 |
-| is_resident | Boolean | Yes | Checkbox | Lives in the building | TRUE |
+| Column         | Type   | Required | Auto-Generated | Description                      | Example           |
+|----------------|--------|----------|----------------|----------------------------------|-------------------|
+| owner_id       | String | Yes      | Yes            | Unique owner identifier          | OWN-001           |
+| apartment      | String | Yes      | No             | Apartment number                 | 5                 |
+| first_name     | String | Yes      | No             | Owner's first name               | David             |
+| family_name    | String | Yes      | No             | Owner's family name              | Cohen             |
+| phone          | String | Yes      | No             | Israeli mobile number            | 050-1234567       |
+| email          | String | No       | No             | Email address                    | david@example.com |
+| storage        | String | No       | No             | Storage room number(s)           | S-05              |
+| parking_spaces | String | No       | No             | Parking number(s)                | P-005,P-006       |
 
 **Validation Rules**:
+- `owner_id`: Auto-generated (OWN-001, OWN-002, etc.), unique, read-only
 - `phone`: Format `/^(\+972-)?05[0-9]-[0-9]{7}$/` (both formats accepted)
 - `phone`: Must be unique across Owners and Tenants tables
 - `email`: Optional, standard email validation
-- `apartment`: Can be comma-separated list (e.g., "5,12" if owns multiple apartments)
-- `storage`: Can be comma-separated list
-- `parking_spaces`: Can be comma-separated list
-- `is_resident`: TRUE if owner lives in building, FALSE if property is rented out or vacant
+- `apartment`: Text field (some buildings use "5A", "5B" notation)
+- `parking_spaces`: Multi-select dropdown from Parking table (comma-separated values)
+  - For tandem pairs: selecting one auto-adds the linked parking
 
-**Conditional Formatting**:
-- Non-resident owners: Highlight light blue
-- Owners with rented-out property: Check Tenants table cross-reference
+**Data Validation Setup**:
+- Column E (phone): Custom formula to validate Israeli phone format
+- Column H (parking_spaces): Multi-select dropdown from Parking!A:A
 
 ---
 
-### Table 3: Tenants
+## Table 3: Tenants
 
-Stores information about tenants (apartment/storage/parking renters).
+Stores information about current tenants.
 
-| Column | Type | Required | Validation | Description | Example |
-|--------|------|----------|------------|-------------|---------|
-| tenant_id | String | Yes | Auto: TEN-XXX | Unique tenant identifier | TEN-001 |
-| first_name | String | Yes | | Tenant's first name | Yossi |
-| family_name | String | Yes | | Tenant's family name | Green |
-| phone | String | Yes | Format validation | Israeli mobile number | 053-7778888 |
-| email | String | No | Email format | Email address | yossi@example.com |
-| street_address | String | No | | Building address (if renting apartment) | HaNassi 15 |
-| apartment | String | No | | Apartment number (if renting) | 12 |
-| storage | String | No | | Storage room number (if renting) | S-12 |
-| parking_spaces | String | No | | Parking number(s) (if renting) | P-012 |
-| rent_from | DateTime | Yes | Must be < rent_until | Lease start date | 2026-01-01T00:00:00+03:00 |
-| rent_until | DateTime | Yes | Must be > rent_from | Lease end date | 2026-12-31T23:59:59+03:00 |
+| Column         | Type   | Required | Auto-Generated | Description                      | Example           |
+|----------------|--------|----------|----------------|----------------------------------|-------------------|
+| tenant_id      | String | Yes      | Yes            | Unique tenant identifier         | TEN-001           |
+| apartment      | String | Yes      | No             | Apartment number                 | 12                |
+| first_name     | String | Yes      | No             | Tenant's first name              | Yossi             |
+| family_name    | String | Yes      | No             | Tenant's family name             | Green             |
+| phone          | String | Yes      | No             | Israeli mobile number            | 053-7778888       |
+| email          | String | No       | No             | Email address                    | yossi@example.com |
+| storage        | String | No       | No             | Storage room number(s)           | S-12              |
+| parking_spaces | String | No       | No             | Parking number(s)                | P-012             |
 
 **Validation Rules**:
+- `tenant_id`: Auto-generated (TEN-001, TEN-002, etc.), unique, read-only
 - `phone`: Format `/^(\+972-)?05[0-9]-[0-9]{7}$/`
 - `phone`: Must be unique across Owners and Tenants tables
-- At least one of `apartment`, `storage`, or `parking_spaces` must be filled
-- `parking_spaces`: Can be comma-separated list
-- `rent_until` > `rent_from`
-- Tenant can rent apartment without parking/storage
-- Tenant can rent parking/storage without apartment (non-resident tenant)
+- `apartment`: Must exist in Owners table (tenants rent from owners)
+- `parking_spaces`: Multi-select dropdown from Parking table
 
 **Business Logic**:
-- If `apartment` is filled → tenant rents apartment (may also rent parking/storage)
-- If only `parking_spaces` or `storage` filled → non-resident tenant (rents only parking/storage)
+- When a tenant record exists for an apartment, the tenant becomes the current resident
+- When tenant lease ends, admin deletes the tenant record (owner becomes resident again)
 
-**Conditional Formatting**:
-- Lease expiring soon (< 30 days): Highlight orange
-- Expired leases: Highlight red
-- Non-resident tenants (no apartment): Highlight light purple
+**Data Validation Setup**:
+- Column E (phone): Same validation as Owners
+- Column H (parking_spaces): Multi-select dropdown from Parking!A:A
 
 ---
 
-### Table 4: Holders (Auto-Generated)
+## Table 4: Residents (Auto-Generated)
 
-**This table is auto-filled via Google Sheets formulas - admin does not edit manually.**
+**This table is auto-filled via Google Sheets formulas — admin does not edit manually.**
 
-Consolidated view of current rights holders (who can list parking/storage for subrental).
+Consolidated view of current residents (who can use the parking rental app).
 
-| Column | Type | Source | Description | Example |
-|--------|------|--------|-------------|---------|
-| holder_id | String | Auto | Unique identifier | H-001 |
-| street_address_apartment | String | Join | `street_address + " - Apt " + apartment` | HaNassi 15 - Apt 12 |
-| full_name | String | Join | `first_name + " " + family_name` | Yossi Green |
-| holder_type | Enum | Logic | `owner` or `tenant` | tenant |
-| phone | String | Copy | Phone number | 053-7778888 |
-| storage | String | Copy | Storage room number | S-12 |
-| parking_spaces | String | Copy | Parking number(s) | P-012 |
+| Column         | Type   | Source        | Description                      | Example           |
+|----------------|--------|---------------|----------------------------------|-------------------|
+| resident_id    | String | Auto          | Unique identifier                | R-001             |
+| apartment      | String | Owner/Tenant  | Apartment number                 | 12                |
+| first_name     | String | Owner/Tenant  | Resident's first name            | Yossi             |
+| family_name    | String | Owner/Tenant  | Resident's family name           | Green             |
+| phone          | String | Owner/Tenant  | Phone number                     | 053-7778888       |
+| email          | String | Owner/Tenant  | Email address                    | yossi@example.com |
+| storage        | String | Owner/Tenant  | Storage room number              | S-12              |
+| parking_spaces | String | Owner/Tenant  | Parking number(s)                | P-012             |
 
 **Formula Logic**:
 
-```
-Holder is included if:
-1. Owner with is_resident = TRUE (lives there)
-2. Owner with is_resident = FALSE AND no tenant rents their property
-3. Tenant with valid lease (rent_until >= TODAY)
-4. Non-resident tenant (no apartment, but rents parking/storage)
+For each apartment:
+1. Check if apartment exists in Tenants table
+2. If YES → use Tenant data
+3. If NO → use Owner data
 
-For each holder:
-- holder_type = "owner" if from Owners table, "tenant" if from Tenants
-- parking_spaces = current parking under their control
-- storage = current storage under their control
-```
-
-**Google Sheets Formula Examples** (to be placed in Holders sheet):
-
-Cell A2 (holder_id):
-```
-="H-" & TEXT(ROW()-1, "000")
-```
-
-Cell B2 (street_address_apartment):
-```
-=IF(ISBLANK(Owners!$A2), Tenants!$E2 & " - Apt " & Tenants!$F2, Owners!$E2 & " - Apt " & Owners!$F2)
-```
-
-Cell C2 (full_name):
-```
-=IF(ISBLANK(Owners!$A2), Tenants!$B2 & " " & Tenants!$C2, Owners!$B2 & " " & Owners!$C2)
-```
-
-**Note**: Actual formulas will need to be more complex to properly merge and filter data from both tables.
-
----
-
-## Application Tables
-
-These tables are managed by the application (Google Apps Script).
-
-### Table 5: Availability
-
-Stores parking/storage listings available for subrental.
-
-| Column | Type | Required | Description | Example |
-|--------|------|----------|-------------|---------|
-| availability_id | String | Yes | Unique ID (UUID or sequential) | AV-2026-0001 |
-| resource_type | Enum | Yes | `parking` or `storage` (MVP: parking only) | parking |
-| resource_number | String | Yes | Parking/storage number | P-005 |
-| owner_phone | String | Yes | Phone of person listing (must be holder) | 050-1234567 |
-| available_from | DateTime | Yes | Availability start (ISO 8601) | 2026-04-05T10:00:00+03:00 |
-| available_to | DateTime | Yes | Availability end (ISO 8601) | 2026-04-07T18:00:00+03:00 |
-| status | Enum | Yes | `available`, `booked`, `cancelled`, `expired` | available |
-| created_at | DateTime | Yes | Record creation timestamp | 2026-04-03T21:30:00+03:00 |
-| updated_at | DateTime | Yes | Last update timestamp | 2026-04-03T21:30:00+03:00 |
-
-**Validation Rules**:
-- `resource_type`: For MVP, must be `parking` (storage support later)
-- `resource_number`: Must exist in Parking table with `status = active`
-- `owner_phone`: Must match a phone in Holders table with matching resource
-- `available_to` > `available_from`
-- Duration: Min 1 hour, max 48 hours (48h = 2880 minutes)
-- `available_from` must be in future (>= NOW)
-- No overlapping availability for same resource (unless status is `cancelled`/`expired`)
-
-**Business Rules**:
-- One holder cannot create overlapping availability for same parking
-- When booking is created, linked availability changes `status` to `booked`
-- Availability auto-expires when `available_to` < NOW()
-
-**Indexes** (for Apps Script optimization):
-- `resource_number` + `status`
-- `available_from` + `available_to` (range queries)
-- `owner_phone`
-
----
-
-### Table 6: Bookings
-
-Stores actual parking/storage reservations.
-
-| Column | Type | Required | Description | Example |
-|--------|------|----------|-------------|---------|
-| booking_id | String | Yes | Unique ID (UUID) | BK-2026-0001 |
-| availability_id | String | Yes | Reference to Availability | AV-2026-0001 |
-| resource_type | Enum | Yes | `parking` or `storage` | parking |
-| resource_number | String | Yes | Denormalized for quick lookup | P-005 |
-| renter_phone | String | Yes | Phone of person booking | 053-7778888 |
-| renter_name | String | No | Name (from Holders) | Yossi Green |
-| booking_start | DateTime | Yes | Booking start (hourly slots) | 2026-04-05T14:00:00+03:00 |
-| booking_end | DateTime | Yes | Booking end (hourly slots) | 2026-04-05T18:00:00+03:00 |
-| status | Enum | Yes | `pending`, `confirmed`, `active`, `completed`, `cancelled` | confirmed |
-| created_at | DateTime | Yes | Booking creation timestamp | 2026-04-04T15:20:00+03:00 |
-| updated_at | DateTime | Yes | Last update timestamp | 2026-04-04T15:20:00+03:00 |
-| cancelled_at | DateTime | No | Cancellation timestamp | - |
-| cancellation_reason | String | No | Why booking was cancelled | - |
-
-**Validation Rules**:
-- `availability_id`: Must exist in Availability table
-- `resource_number`: Must match availability record
-- `renter_phone`: Must exist in Holders table
-- `renter_phone` ≠ `owner_phone` (can't book your own parking)
-- `booking_start` >= `available_from` (from availability)
-- `booking_end` <= `available_to` (from availability)
-- Duration: Min 1 hour, max 48 hours
-- Hourly slots: booking times must be at exact hour marks (e.g., 14:00, 15:00, not 14:30)
-- No overlapping bookings for same resource (unless status is `cancelled`)
-
-**Conflict Resolution Rules**:
-- Auto-block overlapping bookings for same parking
-- One person cannot book more than 2 parking spaces simultaneously (across all active bookings)
-- Linked parking pairs must be booked together (can't book just one)
-
-**Status Flow**:
-1. `pending` - just created, waiting confirmation (auto-confirm for MVP)
-2. `confirmed` - booking accepted
-3. `active` - booking period started (`booking_start` <= NOW < `booking_end`)
-4. `completed` - booking period ended (`booking_end` < NOW)
-5. `cancelled` - booking cancelled by user or admin
-
-**Indexes**:
-- `renter_phone` + `status` (user's active bookings)
-- `resource_number` + `booking_start` + `booking_end` (conflict detection)
-- `availability_id`
-
----
-
-### Table 7: Users_Registry
-
-Phone number registry for authentication (auto-generated from Owners/Tenants).
-
-| Column | Type | Required | Description | Example |
-|--------|------|----------|-------------|---------|
-| phone | String | Yes | User phone (primary key) | 050-1234567 |
-| full_name | String | Yes | Full name | David Cohen |
-| street_address | String | No | Building address | HaNassi 15 |
-| apartment | String | No | Apartment (if owner/tenant) | 5 |
-| role | Enum | Yes | `owner`, `tenant`, `admin` | owner |
-| is_active | Boolean | Yes | Account active status | TRUE |
-| registered_at | DateTime | Yes | Registration timestamp | 2026-01-01T00:00:00+03:00 |
-| last_login | DateTime | No | Last successful login | 2026-04-03T21:30:00+03:00 |
-
-**Auto-Population Logic**:
-- Sync from Owners table: all owners added with `role = owner`
-- Sync from Tenants table: all tenants with valid lease added with `role = tenant`
-- Admin manually sets `role = admin` for building manager(s)
-- `is_active = FALSE` blocks login
-
-**Validation Rules**:
-- `phone`: Unique, must exist in Owners or Tenants
-- `role`: Defaults to `owner` or `tenant`, manually set to `admin`
-- Expired tenants automatically set `is_active = FALSE`
-
----
-
-## Data Maintenance & Automation
-
-### Auto-Updates (Google Apps Script Time-Driven Triggers)
-
-Run daily at 00:05 AM Jerusalem time:
-
-1. **Expire old availability**:
-   ```
-   UPDATE Availability 
-   SET status = 'expired' 
-   WHERE available_to < NOW() AND status = 'available'
-   ```
-
-2. **Update booking status to active**:
-   ```
-   UPDATE Bookings 
-   SET status = 'active' 
-   WHERE booking_start <= NOW() AND booking_end > NOW() AND status = 'confirmed'
-   ```
-
-3. **Complete finished bookings**:
-   ```
-   UPDATE Bookings 
-   SET status = 'completed' 
-   WHERE booking_end < NOW() AND status IN ('active', 'confirmed')
-   ```
-
-4. **Sync Users_Registry**:
-   ```
-   - Add new owners/tenants
-   - Deactivate expired tenants
-   - Update names/apartments if changed
-   ```
-
-5. **Regenerate Holders table**:
-   ```
-   - Recalculate from Owners + Tenants
-   - Apply residency rules
-   - Update parking/storage assignments
-   ```
-
-### Manual Admin Tasks
-
-- Update Owners table when ownership changes
-- Update Tenants table when new lease starts/ends
-- Update Parking table when parking status changes (maintenance, etc.)
-- Manually resolve booking conflicts if system auto-blocking fails
-- Set `role = admin` in Users_Registry for building managers
+**Implementation**: Use QUERY or ARRAYFORMULA to merge Owners and Tenants, prioritizing Tenants when apartment exists in both tables.
 
 ---
 
@@ -347,91 +149,259 @@ Run daily at 00:05 AM Jerusalem time:
 
 Template should include realistic test data:
 
-### Buildings
-- 2 buildings: "HaNassi 15" and "HaNassi 17"
-- HaNassi 15: 20 apartments
-- HaNassi 17: 16 apartments
-- Total: 36 apartments
-
 ### Parking Spaces
-- 40 total parking spaces across both buildings
+- 15 total parking spaces
 - Type breakdown:
-  - 28 regular (70%)
-  - 4 limited_access (10%)
-  - 4 premium (10%)
-  - 2 disabled (5%)
-  - 2 linked pairs = 4 spaces (10%)
-- Ownership:
-  - 36 private (1 per apartment average)
-  - 4 common (building-owned visitor parking)
+  - 11 regular (73%)
+  - 2 tandem pairs = 4 spaces (27%)
+  - 0 wheelchair (will add later if needed)
 
 ### Owners
-- 36 apartments with owners
-- Mix of single owners and co-owners (couples)
-- 80% resident owners (live in building)
-- 20% non-resident owners (rented out or vacant)
+- 12 apartments with owners
+- Mix of single owners and co-owners (some apartments have 2 owners)
+- Some apartments have multiple parking spaces
+- Some have no parking (street parking only)
 
 ### Tenants
-- 10 apartments rented (6 in HaNassi 15, 4 in HaNassi 17)
-- Mix of single tenants and couples
-- 2 non-resident tenants (rent only parking, no apartment)
-- Lease periods: some expiring soon, some long-term
+- 4 apartments rented
+- Tenants have parking transferred from owner
 
-### Availability
-- 5 listings: mix of short-term (few hours), medium (1-2 days), near-limit (48h)
-- Different parking types listed
-- Different buildings
-
-### Bookings
-- 4 bookings in different statuses:
-  - 1 confirmed (future)
-  - 1 active (ongoing)
-  - 1 completed (past)
-  - 1 cancelled
-- Show conflict scenarios in comments/notes
+### Residents
+- Auto-generated: 12 apartments total
+- 4 show tenant data
+- 8 show owner data
 
 ---
 
-## Google Sheets Formulas for Holders Table
+## Google Sheets Setup Instructions
 
-**Detailed formula logic for auto-generating Holders table:**
+### Auto-Generated IDs
 
-### Step 1: Create Helper Columns in Owners/Tenants
-
-**Owners sheet** - Add column `is_holder`:
+**Parking.parking_id (Column A)**:
 ```
-=IF(AND(I2=TRUE), TRUE, IF(COUNTIFS(Tenants!$E:$E, E2, Tenants!$F:$F, F2, Tenants!$J:$J, ">="&TODAY())=0, TRUE, FALSE))
+=IF(B2<>"", "P-" & TEXT(ROW()-1, "000"), "")
 ```
-Logic: Owner is holder if resident OR if non-resident with no active tenant
+- Generates P-001, P-002, etc.
+- Only generates if type (column B) is filled
 
-**Tenants sheet** - Add column `is_holder`:
+**Owners.owner_id (Column A)**:
 ```
-=IF(J2>=TODAY(), TRUE, FALSE)
+=IF(B2<>"", "OWN-" & TEXT(ROW()-1, "000"), "")
 ```
-Logic: Tenant is holder if lease is still active
+- Generates OWN-001, OWN-002, etc.
+- Only generates if apartment (column B) is filled
 
-### Step 2: Holders Table Formulas
+**Tenants.tenant_id (Column A)**:
+```
+=IF(B2<>"", "TEN-" & TEXT(ROW()-1, "000"), "")
+```
+- Generates TEN-001, TEN-002, etc.
+- Only generates if apartment (column B) is filled
 
-Use `QUERY` function to merge and filter:
+**Residents.resident_id (Column A)**:
+```
+=IF(B2<>"", "R-" & TEXT(ROW()-1, "000"), "")
+```
+- Generates R-001, R-002, etc.
+- Auto-generated as part of the main formula
+
+### Protecting Auto-Generated Columns
+
+1. Select column A in each sheet (Parking, Owners, Tenants, Residents)
+2. Data → Protect sheets and ranges
+3. Set range: `Sheet!A:A`
+4. Permissions: "Show a warning when editing this range"
+5. Description: "Auto-generated IDs - do not edit manually"
+
+This allows viewing but warns before editing.
+
+### Multi-Select Parking Dropdown
+
+**Challenge**: Google Sheets does not natively support multi-select dropdowns.
+
+**Solutions**:
+
+**Option 1: Manual Comma-Separated Entry with Validation**
+1. Use Data Validation on parking_spaces column
+2. Criteria: Custom formula `=COUNTIF(Parking!$A:$A, SPLIT(H2, ","))=COUNTA(SPLIT(H2, ","))`
+3. User manually types: `P-001,P-002`
+4. Formula validates each ID exists in Parking table
+
+**Option 2: Apps Script for Multi-Select**
+- Create custom dropdown with checkboxes using Apps Script
+- More user-friendly but requires coding
+- See `docs/google-sheets-setup.md` for implementation
+
+**Option 3: Helper Columns**
+- Parking_1, Parking_2, Parking_3 columns with simple dropdowns
+- CONCATENATE them into parking_spaces
+- More columns but simpler setup
+
+### Tandem Pair Auto-Add
+
+**Challenge**: Selecting one tandem parking should auto-add its pair.
+
+**Solution**: Apps Script `onEdit` trigger
+
+```javascript
+function onEdit(e) {
+  const sheet = e.source.getActiveSheet();
+  const range = e.range;
+  
+  // Only run on Owners/Tenants parking_spaces column (column H)
+  if ((sheet.getName() === "Owners" || sheet.getName() === "Tenants") && 
+      range.getColumn() === 8) {
+    
+    const parkingSheet = e.source.getSheetByName("Parking");
+    const parkingData = parkingSheet.getDataRange().getValues();
+    
+    const selectedIds = range.getValue().toString().split(",");
+    const allIds = [];
+    
+    selectedIds.forEach(id => {
+      const trimmedId = id.trim();
+      allIds.push(trimmedId);
+      
+      // Find this parking in Parking table
+      for (let i = 1; i < parkingData.length; i++) {
+        if (parkingData[i][0] === trimmedId && parkingData[i][1] === "tandem") {
+          const linkedId = parkingData[i][2];
+          if (linkedId && !allIds.includes(linkedId)) {
+            allIds.push(linkedId);
+          }
+        }
+      }
+    });
+    
+    range.setValue(allIds.join(","));
+  }
+}
+```
+
+### Preventing Duplicate parking_id / linked_id
+
+**For parking_id (auto-generated)**: Already unique by formula (based on row number).
+
+**For linked_id**: 
+1. Column C Data Validation
+2. Custom formula: `=COUNTIF($C:$C, C2)<=1`
+3. Reject input if duplicate
+4. Show warning: "This parking ID is already used as a linked_id"
+
+**Additional check** (Apps Script):
+```javascript
+function validateLinkedId(e) {
+  const sheet = e.source.getActiveSheet();
+  if (sheet.getName() !== "Parking") return;
+  
+  const range = e.range;
+  if (range.getColumn() === 3) { // linked_id column
+    const linkedId = range.getValue();
+    const parkingId = range.offset(0, -2).getValue(); // Column A
+    
+    // Check linked parking exists and links back
+    const parkingSheet = e.source.getSheetByName("Parking");
+    const parkingData = parkingSheet.getDataRange().getValues();
+    
+    let foundMatch = false;
+    for (let i = 1; i < parkingData.length; i++) {
+      if (parkingData[i][0] === linkedId) {
+        if (parkingData[i][2] === parkingId) {
+          foundMatch = true;
+        }
+        break;
+      }
+    }
+    
+    if (!foundMatch) {
+      Browser.msgBox("Warning: Linked parking " + linkedId + " does not link back to " + parkingId);
+    }
+  }
+}
+```
+
+---
+
+## Residents Table Auto-Population Formula
+
+**Goal**: Merge Owners and Tenants, prioritizing Tenants when apartment exists in both.
+
+**Formula for Residents!A2**:
 
 ```
-=QUERY({
-  Owners!A2:J, "owner", Owners!K2:K;
-  Tenants!A2:K, "tenant", Tenants!L2:L
-}, 
-"SELECT Col11, Col5, Col6, Col2, Col3, Col4, Col7, Col8, Col12 
-WHERE Col13 = TRUE", 0)
+=ARRAYFORMULA(
+  IF(ROW(A:A)=1, 
+    {"resident_id","apartment","first_name","family_name","phone","email","storage","parking_spaces"},
+    IF(LEN(A:A),
+      IFERROR(
+        QUERY(
+          {
+            Tenants!A2:A & "~" & Tenants!B2:B & "~" & Tenants!C2:C & "~" & Tenants!D2:D & "~" & Tenants!E2:E & "~" & Tenants!F2:F & "~" & Tenants!G2:G & "~" & Tenants!H2:H, 
+            "TENANT";
+            Owners!A2:A & "~" & Owners!B2:B & "~" & Owners!C2:C & "~" & Owners!D2:D & "~" & Owners!E2:E & "~" & Owners!F2:F & "~" & Owners!G2:G & "~" & Owners!H2:H, 
+            "OWNER"
+          },
+          "SELECT * WHERE Col1 <> '~~~~~~~' ORDER BY Col2, Col9"
+        ),
+      )
+    ,)
+  )
+)
 ```
 
-**Note**: Exact column references will depend on final table structure. This is a conceptual example.
+**Simpler Alternative (Recommended)**:
+
+Place this in Residents!B2 (apartment column):
+```
+=UNIQUE(SORT(FILTER({Owners!B2:B;Tenants!B2:B}, LEN({Owners!B2:B;Tenants!B2:B})>0)))
+```
+
+Then for each row, use VLOOKUP to check Tenants first:
+
+Residents!A2:
+```
+="R-" & TEXT(ROW()-1, "000")
+```
+
+Residents!C2 (first_name):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$C, 2, FALSE), VLOOKUP(B2, Owners!$B:$C, 2, FALSE))
+```
+
+Residents!D2 (family_name):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$D, 3, FALSE), VLOOKUP(B2, Owners!$B:$D, 3, FALSE))
+```
+
+Residents!E2 (phone):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$E, 4, FALSE), VLOOKUP(B2, Owners!$B:$E, 4, FALSE))
+```
+
+Residents!F2 (email):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$F, 5, FALSE), VLOOKUP(B2, Owners!$B:$F, 5, FALSE))
+```
+
+Residents!G2 (storage):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$G, 6, FALSE), VLOOKUP(B2, Owners!$B:$G, 6, FALSE))
+```
+
+Residents!H2 (parking_spaces):
+```
+=IFERROR(VLOOKUP(B2, Tenants!$B:$H, 7, FALSE), VLOOKUP(B2, Owners!$B:$H, 7, FALSE))
+```
+
+Copy formulas down for all rows with apartments.
 
 ---
 
 ## Next Steps
 
-1. Create Google Sheets template with all tables
-2. Implement data validation dropdowns
-3. Add conditional formatting rules
-4. Write Google Apps Script for auto-updates
-5. Create sample data for testing
-6. Document API endpoints (separate file)
+1. Create Google Sheets with 4 tables
+2. Set up auto-generated ID formulas
+3. Configure data validation dropdowns
+4. Implement Residents auto-population formulas
+5. Insert sample data for testing
+6. Create simple mobile web interface to display Residents and Parking data

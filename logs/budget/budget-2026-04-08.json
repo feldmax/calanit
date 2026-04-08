@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-08",
+  "sessions": [
+    {
+      "session_id": "session-2026-04-08-223710-sonnet",
+      "model": "sonnet",
+      "model_full_name": "claude-4.5-sonnet",
+      "start_time": "2026-04-08T22:37:10+03:00",
+      "input_tokens": 2200,
+      "output_tokens": 50000,
+      "cache_read_tokens": 2100000,
+      "cache_write_tokens": 496500,
+      "total_tokens": 52200,
+      "estimated_cost_usd": 5.39,
+      "notes": "Simplified MVP structure: updated docs to 4 tables, 3 parking types, single building. Rewrote google-sheets-setup.md and sample-data.md. Context continuation session."
+    }
+  ],
+  "daily_total_tokens": 52200,
+  "daily_total_cost_usd": 5.39,
+  "pricing_reference": {
+    "sonnet": {
+      "input_per_mtok": 3.0,
+      "output_per_mtok": 15.0,
+      "cache_read_per_mtok": 0.3,
+      "cache_write_per_mtok": 3.75
+    },
+    "note": "Pricing as of April 2026, Claude 4.5 Sonnet. Cost includes cache read/write tokens."
+  }
+}

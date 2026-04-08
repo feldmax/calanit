@@ -16,10 +16,24 @@
 ## Development Workflow
 
 ### Branch Management
-- **CRITICAL**: Every agent session must run in a separate feature branch
+
+**🚨 ABSOLUTE RULE: NEVER WORK IN main OR master BRANCH 🚨**
+
+- **CRITICAL**: Every agent session MUST run in a separate feature branch
+- **MANDATORY**: At the start of EVERY session, check current branch with `git branch --show-current`
+- **MANDATORY**: If on `main` or `master`, immediately create and switch to a feature branch
 - Branch naming: `feature/YYYY-MM-DD-<task-description>`
 - Never commit or merge to `main` or `master` directly
 - User will manually review and merge all changes
+
+**Workflow**:
+1. Start session → check current branch
+2. If on `main`/`master` → create feature branch immediately
+3. Do all work in feature branch
+4. Leave changes unstaged for user review
+5. User reviews → commits → merges to main
+
+**Why this rule exists**: Working in `main` pollutes the main branch with unreviewed changes. Feature branches allow user to review, test, and selectively merge changes.
 
 ### Logging Requirements
 
