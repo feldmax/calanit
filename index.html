@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calanit 16 Parking</title>
+    <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Calanit 16 parking</h1>
+    </header>
+
+    <div class="container">
+        <div id="parking-container" class="parking-grid">
+            <div class="loading">Loading parking spaces...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { getParkingData, getResidentsData } from './src/js/data.js';
+
+        // Store data globally for navigation
+        window.parkingData = null;
+        window.residentsData = null;
+
+        /**
+         * Get display number from parking ID
+         */
+        function getParkingNumber(parkingId) {
+            // Return full parking ID as in Google Sheets (e.g., "P-001")
+            return parkingId;
+        }
+
+        /**
+         * Create wheelchair icon SVG
+         */
+        function createWheelchairIcon() {
+            const icon = document.createElement('div');
+            icon.className = 'wheelchair-icon';
+            icon.innerHTML = '♿';
+            return icon;
+        }
+
+        /**
+         * Create a parking tile element
+         */
+        function createParkingTile(parking, isRegular = true) {
+            const tile = document.createElement('a');
+            tile.className = isRegular ? 'parking-tile' : 'tandem-tile';
+            tile.href = `parking-properties.html?id=${parking.parking_id}`;
+
+            const content = document.createElement('div');
+            content.className = 'parking-tile-content';
+
+            const number = document.createElement('span');
+            number.className = 'parking-number';
+            number.textContent = getParkingNumber(parking.parking_id);
+            content.appendChild(number);
+
+            // Add wheelchair icon if applicable
+            if (parking.type === 'wheelchair') {
+                content.appendChild(createWheelchairIcon());
+            }
+
+            tile.appendChild(content);
+            return tile;
+        }
+
+        /**
+         * Create tandem parking container
+         */
+        function createTandemContainer(parking1, parking2) {
+            const container = document.createElement('div');
+            container.className = 'tandem-container';
+
+            // Create a wrapper link for both tiles
+            const link = document.createElement('a');
+            link.href = `parking-properties.html?id=${parking1.parking_id},${parking2.parking_id}`;
+            link.style.display = 'contents';
+
+            const tile1 = document.createElement('div');
+            tile1.className = 'tandem-tile';
+            const content1 = document.createElement('div');
+            content1.className = 'parking-tile-content';
+            const number1 = document.createElement('span');
+            number1.className = 'parking-number';
+            number1.textContent = getParkingNumber(parking1.parking_id);
+            content1.appendChild(number1);
+            if (parking1.type === 'wheelchair') {
+                content1.appendChild(createWheelchairIcon());
+            }
+            tile1.appendChild(content1);
+
+            const tile2 = document.createElement('div');
+            tile2.className = 'tandem-tile';
+            const content2 = document.createElement('div');
+            content2.className = 'parking-tile-content';
+            const number2 = document.createElement('span');
+            number2.className = 'parking-number';
+            number2.textContent = getParkingNumber(parking2.parking_id);
+            content2.appendChild(number2);
+            if (parking2.type === 'wheelchair') {
+                content2.appendChild(createWheelchairIcon());
+            }
+            tile2.appendChild(content2);
+
+            link.appendChild(tile1);
+            link.appendChild(tile2);
+            container.appendChild(link);
+
+            return container;
+        }
+
+        /**
+         * Render parking spaces grid
+         */
+        async function renderParkingSpaces() {
+            try {
+                const parkingData = await getParkingData();
+                const residentsData = await getResidentsData();
+
+                // Store globally
+                window.parkingData = parkingData;
+                window.residentsData = residentsData;
+
+                const container = document.getElementById('parking-container');
+                container.innerHTML = '';
+
+                const processedIds = new Set();
+
+                parkingData.forEach(parking => {
+                    // Skip if already processed (tandem partner)
+                    if (processedIds.has(parking.parking_id)) {
+                        return;
+                    }
+
+                    // Check if this is a tandem parking
+                    if (parking.type === 'tandem' && parking.linked_id) {
+                        let partner = parkingData.find(p => p.parking_id === parking.linked_id);
+
+                        // If partner not found in data, create virtual partner object
+                        if (!partner) {
+                            partner = {
+                                parking_id: parking.linked_id,
+                                type: 'tandem',
+                                linked_id: parking.parking_id
+                            };
+                        }
+
+                        const tandemContainer = createTandemContainer(parking, partner);
+                        container.appendChild(tandemContainer);
+                        processedIds.add(parking.parking_id);
+                        processedIds.add(partner.parking_id);
+                    } else {
+                        // Regular or wheelchair parking
+                        const tile = createParkingTile(parking);
+                        container.appendChild(tile);
+                        processedIds.add(parking.parking_id);
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error rendering parking spaces:', error);
+                const container = document.getElementById('parking-container');
+                container.innerHTML = '<div class="error">Error loading parking data. Please try again later.</div>';
+            }
+        }
+
+        // Initialize on page load
+        renderParkingSpaces();
+    </script>
+</body>
+</html>
