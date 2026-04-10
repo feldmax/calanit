@@ -35,11 +35,98 @@
 
 **Why this rule exists**: Working in `main` pollutes the main branch with unreviewed changes. Feature branches allow user to review, test, and selectively merge changes.
 
+### Custom Commands
+
+#### `/logs` Command
+
+**User input**: When user types `/logs` (exact match, case-insensitive)
+
+**Agent must execute**:
+1. Collect current session data:
+   - Session start timestamp
+   - Model(s) used during session
+   - All user prompts (in Russian)
+   - All agent responses summary (in Russian with English technical terms)
+   - All tools used
+   - All files created/modified
+   - Token usage from `/cost` command output
+   - API duration and wall clock duration
+   - Code changes statistics (lines added/removed)
+
+2. Create session log file:
+   - Path: `logs/sessions/session-YYYY-MM-DD-HHmmss-<model>.md`
+   - Use timestamp from session start
+   - Include all collected data in structured markdown format
+   - Add sections: Session Info, User Prompts, Agent Actions, Tools Used, Files Modified, Budget Tracking
+
+3. Create/update daily budget file:
+   - Path: `logs/budget/budget-YYYY-MM-DD.json`
+   - If file exists, append session data to `sessions` array
+   - Update `daily_total_tokens` and `daily_total_cost_usd`
+   - Include token breakdown by model
+   - Include cache usage if applicable
+
+4. Update monthly summary file:
+   - Path: `logs/budget/budget-summary-YYYY-MM.md`
+   - Add current session to daily breakdown table
+   - Add session details to chronological list
+   - Recalculate monthly totals
+   - Update "By Model" statistics
+   - Update "Last updated" date
+
+5. Confirm to user:
+   - "✅ Session logs created: `<session-log-filename>`"
+   - "✅ Budget updated: daily and monthly summaries"
+   - Show brief summary: cost, tokens, files modified
+
+**IMPORTANT**: 
+- Do NOT create session logs at the beginning of a session
+- Only create/update logs when user explicitly calls `/logs` command
+- Session logs should be created at the END of the session via `/logs` command
+- If `/logs` called multiple times in same session, update existing files
+
+#### `exit` Command Behavior
+
+**User input**: When user types `exit` or indicates session should end
+
+**Agent must check**:
+1. Was `/logs` command executed during this session?
+2. Does session log file exist in `logs/sessions/` for current session timestamp?
+3. Was daily budget file updated for today's date?
+
+**If logs NOT created or creation failed**:
+```
+⚠️  Session logs have not been created yet.
+
+Would you like to run /logs before exiting to save:
+- Session log with all prompts and responses
+- Budget tracking (cost: $X.XX, tokens: XXXXX)
+- Files modified: X files
+
+Type 'yes' to create logs, or 'no' to exit without saving logs.
+```
+
+**If user confirms** (`yes`):
+- Execute `/logs` command steps (see above)
+- Then exit session
+
+**If user declines** (`no`):
+- Exit without creating logs
+- Warn: "⚠️  Session logs not saved. This session will not be tracked in budget."
+
+**If logs already created**:
+- Exit normally
+- Optionally show: "✅ Session logs saved. Safe to exit."
+
+**Note**: This behavior ensures no session work is lost and budget tracking remains accurate.
+
 ### Logging Requirements
 
-All operations must be logged automatically without confirmation prompts:
+Session logging is managed via the `/logs` custom command (see Custom Commands section above).
 
 #### 1. Session Logs (`logs/sessions/`)
+**Created via `/logs` command**
+
 Format: `session-YYYY-MM-DD-HHmmss-<model>.md`
 
 Must include:
@@ -51,6 +138,8 @@ Must include:
 - Files modified
 
 #### 2. Agent/Subagent Logs (`logs/agents/`)
+**Created automatically when subagents are used**
+
 Format: `agent-<agent-type>-YYYY-MM-DD-HHmmss.md`
 
 Must include:
@@ -61,6 +150,7 @@ Must include:
 - Files accessed
 
 #### 3. Budget Tracking (`logs/budget/`)
+**Created/updated via `/logs` command**
 
 **Daily file**: `budget-YYYY-MM-DD.json`
 ```json
