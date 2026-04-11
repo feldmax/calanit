@@ -5,6 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parking Details - Calanit 16</title>
     <link rel="stylesheet" href="src/css/styles.css">
+    <style>
+        /* Owner control panel */
+        .owner-control-panel {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border: 2px solid #0066cc;
+        }
+
+        .owner-message {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .status-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .status-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background-color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .status-option:hover {
+            background-color: #f0f0f0;
+        }
+
+        .status-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .status-label {
+            font-size: 16px;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .status-label.status-red {
+            color: #dc3545;
+        }
+
+        .status-label.status-green {
+            color: #28a745;
+        }
+
+        .status-label.status-grey {
+            color: #666;
+        }
+
+        /* Property card status colors */
+        .property-card.status-occupied {
+            background-color: #ffe5e5;
+            border: 2px solid #dc3545;
+        }
+
+        .property-card.status-free {
+            background-color: #e5ffe5;
+            border: 2px solid #28a745;
+        }
+
+        .property-card.status-default {
+            background-color: #fff;
+            border: none;
+        }
+
+        @media (max-width: 480px) {
+            .owner-message {
+                font-size: 14px;
+            }
+
+            .status-label {
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
 <body>
     <a href="index.html" class="back-button">
@@ -18,7 +105,40 @@
     </div>
 
     <script type="module">
-        import { getParkingData, getResidentsData, getResidentsForParking } from './src/js/data.js';
+        import { getParkingData, getResidentsData, getResidentsForParking, getUserPhone, getResidentByPhone } from './src/js/data.js';
+
+        /**
+         * Get parking status from localStorage
+         * @param {string} parkingId - Parking space ID
+         * @returns {string|null} Status: 'occupied', 'free', or null (default)
+         */
+        function getParkingStatus(parkingId) {
+            return localStorage.getItem(`parking_status_${parkingId}`);
+        }
+
+        /**
+         * Set parking status in localStorage
+         * @param {string} parkingId - Parking space ID
+         * @param {string|null} status - Status: 'occupied', 'free', or null to clear
+         */
+        function setParkingStatus(parkingId, status) {
+            if (status === null) {
+                localStorage.removeItem(`parking_status_${parkingId}`);
+            } else {
+                localStorage.setItem(`parking_status_${parkingId}`, status);
+            }
+
+            // Update tile colors on index page
+            updateTileColors();
+        }
+
+        /**
+         * Update tile colors based on status
+         */
+        function updateTileColors() {
+            // This will be handled by index.html on page load
+            // Here we just store the status
+        }
 
         /**
          * Get parking IDs from URL query parameter
@@ -93,6 +213,89 @@
         }
 
         /**
+         * Create owner control panel
+         * @param {string} parkingId - Parking space ID
+         * @returns {HTMLElement} Control panel element
+         */
+        function createOwnerControlPanel(parkingId) {
+            const panel = document.createElement('div');
+            panel.className = 'owner-control-panel';
+
+            const message = document.createElement('div');
+            message.className = 'owner-message';
+            message.textContent = 'This is your parking space. You can set its status to occupied, free, or reset this setting.';
+            panel.appendChild(message);
+
+            const statusControls = document.createElement('div');
+            statusControls.className = 'status-controls';
+
+            // Get current status
+            const currentStatus = getParkingStatus(parkingId);
+
+            // Radio buttons
+            const statuses = [
+                { value: 'occupied', label: 'Occupied', color: 'red' },
+                { value: 'free', label: 'Free', color: 'green' },
+                { value: 'default', label: 'Reset setting', color: 'grey' }
+            ];
+
+            statuses.forEach(status => {
+                const label = document.createElement('label');
+                label.className = 'status-option';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `status_${parkingId}`;
+                radio.value = status.value;
+                radio.checked = (status.value === 'default' && !currentStatus) || currentStatus === status.value;
+
+                // Add change handler
+                radio.addEventListener('change', () => {
+                    if (status.value === 'default') {
+                        setParkingStatus(parkingId, null);
+                    } else {
+                        setParkingStatus(parkingId, status.value);
+                    }
+                    // Update card background
+                    updateCardBackground(parkingId, status.value);
+                });
+
+                const span = document.createElement('span');
+                span.textContent = status.label;
+                span.className = `status-label status-${status.color}`;
+
+                label.appendChild(radio);
+                label.appendChild(span);
+                statusControls.appendChild(label);
+            });
+
+            panel.appendChild(statusControls);
+            return panel;
+        }
+
+        /**
+         * Update card background color based on status
+         * @param {string} parkingId - Parking space ID
+         * @param {string} status - Status: 'occupied', 'free', or 'default'
+         */
+        function updateCardBackground(parkingId, status) {
+            const card = document.querySelector('.property-card');
+            if (!card) return;
+
+            // Remove existing status classes
+            card.classList.remove('status-occupied', 'status-free', 'status-default');
+
+            // Add new status class
+            if (status === 'occupied') {
+                card.classList.add('status-occupied');
+            } else if (status === 'free') {
+                card.classList.add('status-free');
+            } else {
+                card.classList.add('status-default');
+            }
+        }
+
+        /**
          * Render property details
          */
         async function renderPropertyDetails() {
@@ -105,6 +308,8 @@
 
                 const parkingData = await getParkingData();
                 const residentsData = await getResidentsData();
+                const userPhone = getUserPhone();
+                const currentUser = getResidentByPhone(userPhone, residentsData);
 
                 const container = document.getElementById('property-container');
                 container.innerHTML = '';
@@ -112,13 +317,6 @@
                 // Create property card
                 const card = document.createElement('div');
                 card.className = 'property-card';
-
-                // Header with parking number(s)
-                const header = document.createElement('div');
-                header.className = 'property-header';
-
-                const title = document.createElement('h2');
-                title.className = 'property-title';
 
                 // Get parking details
                 // If parking not found in data, create virtual object (for tandem partners)
@@ -139,6 +337,13 @@
                     throw new Error('Parking space not found');
                 }
 
+                // Header with parking number(s)
+                const header = document.createElement('div');
+                header.className = 'property-header';
+
+                const title = document.createElement('h2');
+                title.className = 'property-title';
+
                 // Display parking numbers with proper formatting
                 // For tandem: "P-004 - P-005", for single: "P-001"
                 const numbers = parkingSpaces.map(p => p.parking_id).join(' - ');
@@ -155,29 +360,46 @@
                 header.appendChild(title);
                 card.appendChild(header);
 
-                // Residents list
+                // Check if current user owns this parking space
+                const isOwner = currentUser && parkingIds.some(parkingId => {
+                    const parkingSpacesOwned = currentUser.parking_spaces.split(',').map(p => p.trim());
+                    return parkingSpacesOwned.includes(parkingId);
+                });
+
+                // Residents list or owner control
                 const residentsList = document.createElement('div');
                 residentsList.className = 'residents-list';
 
-                // Get all residents for these parking spaces
-                const allResidents = new Set();
-                parkingIds.forEach(parkingId => {
-                    const residents = getResidentsForParking(parkingId, residentsData);
-                    residents.forEach(r => allResidents.add(JSON.stringify(r)));
-                });
+                if (isOwner) {
+                    // Show owner control panel
+                    const ownerPanel = createOwnerControlPanel(parkingIds[0]);
+                    residentsList.appendChild(ownerPanel);
 
-                const uniqueResidents = Array.from(allResidents).map(r => JSON.parse(r));
-
-                if (uniqueResidents.length === 0) {
-                    const noResidents = document.createElement('div');
-                    noResidents.className = 'resident-card';
-                    noResidents.textContent = 'No residents assigned to this parking space';
-                    residentsList.appendChild(noResidents);
+                    // Apply current status to card
+                    const currentStatus = getParkingStatus(parkingIds[0]) || 'default';
+                    updateCardBackground(parkingIds[0], currentStatus);
                 } else {
-                    uniqueResidents.forEach(resident => {
-                        const residentCard = createResidentCard(resident, parkingIds[0]);
-                        residentsList.appendChild(residentCard);
+                    // Show residents as before
+                    // Get all residents for these parking spaces
+                    const allResidents = new Set();
+                    parkingIds.forEach(parkingId => {
+                        const residents = getResidentsForParking(parkingId, residentsData);
+                        residents.forEach(r => allResidents.add(JSON.stringify(r)));
                     });
+
+                    const uniqueResidents = Array.from(allResidents).map(r => JSON.parse(r));
+
+                    if (uniqueResidents.length === 0) {
+                        const noResidents = document.createElement('div');
+                        noResidents.className = 'resident-card';
+                        noResidents.textContent = 'No residents assigned to this parking space';
+                        residentsList.appendChild(noResidents);
+                    } else {
+                        uniqueResidents.forEach(resident => {
+                            const residentCard = createResidentCard(resident, parkingIds[0]);
+                            residentsList.appendChild(residentCard);
+                        });
+                    }
                 }
 
                 card.appendChild(residentsList);

@@ -119,10 +119,117 @@ function getTandemPartner(parkingId, parkingData) {
     return partner || null;
 }
 
+/**
+ * Store user phone number in localStorage
+ * @param {string} phone - User's phone number
+ */
+function setUserPhone(phone) {
+    localStorage.setItem('calanit_user_phone', phone);
+}
+
+/**
+ * Get user phone number from localStorage
+ * @returns {string|null} User's phone number or null
+ */
+function getUserPhone() {
+    return localStorage.getItem('calanit_user_phone');
+}
+
+/**
+ * Detect device phone number
+ * Uses device settings on mobile (iOS: Settings > Cellular > My Number)
+ * Falls back to 050-1234567 for desktop testing
+ *
+ * Note: Browser-based web apps cannot directly access device phone number due to privacy.
+ * For production iOS app, this would require:
+ * - Native iOS app with proper permissions (CoreTelephony framework)
+ * - Or SMS-based verification during onboarding
+ * - Or deep link with phone number parameter
+ *
+ * For MVP testing: Uses default phone 050-1234567 (matches David Cohen in sample data)
+ *
+ * @returns {Promise<string>} Phone number
+ */
+async function detectDevicePhoneNumber() {
+    // Check if phone number already stored
+    let phone = getUserPhone();
+    if (phone) {
+        return phone;
+    }
+
+    // Default phone for desktop/web testing - matches David Cohen (apartment 1)
+    const DEFAULT_PHONE = '050-1234567';
+
+    try {
+        // Check if we're on a mobile device
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (!isMobile) {
+            // Desktop browser - use default test phone
+            console.log('Desktop detected, using test phone:', DEFAULT_PHONE);
+            setUserPhone(DEFAULT_PHONE);
+            return DEFAULT_PHONE;
+        }
+
+        // Mobile device detected
+        // For MVP web app: use default phone (same as desktop)
+        // TODO: For native iOS app, integrate CoreTelephony to read actual device number
+        console.log('Mobile detected, using test phone:', DEFAULT_PHONE);
+        setUserPhone(DEFAULT_PHONE);
+        return DEFAULT_PHONE;
+
+    } catch (error) {
+        console.log('Phone detection error, using default:', error);
+        setUserPhone(DEFAULT_PHONE);
+        return DEFAULT_PHONE;
+    }
+}
+
+/**
+ * Check if phone number exists in residents list
+ * @param {string} phone - Phone number to check
+ * @param {Array} residents - Array of resident objects
+ * @returns {boolean} True if phone exists in residents list
+ */
+function isPhoneRegistered(phone, residents) {
+    if (!phone || !residents) return false;
+
+    // Normalize phone number (remove non-digits)
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    return residents.some(resident => {
+        const residentPhone = resident.phone.replace(/\D/g, '');
+        return residentPhone === normalizedPhone;
+    });
+}
+
+/**
+ * Get resident by phone number
+ * @param {string} phone - Phone number
+ * @param {Array} residents - Array of resident objects
+ * @returns {Object|null} Resident object or null
+ */
+function getResidentByPhone(phone, residents) {
+    if (!phone || !residents) return null;
+
+    // Normalize phone number (remove non-digits)
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    return residents.find(resident => {
+        const residentPhone = resident.phone.replace(/\D/g, '');
+        return residentPhone === normalizedPhone;
+    }) || null;
+}
+
 // Export functions
 export {
     getParkingData,
     getResidentsData,
     getResidentsForParking,
-    getTandemPartner
+    getTandemPartner,
+    setUserPhone,
+    getUserPhone,
+    detectDevicePhoneNumber,
+    isPhoneRegistered,
+    getResidentByPhone
 };

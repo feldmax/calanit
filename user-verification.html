@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Required - Calanit 16</title>
+    <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+    <a href="index.html" class="back-button">
+        ←
+    </a>
+
+    <div class="container">
+        <div class="verification-message">
+            <div class="verification-icon">🔒</div>
+            <h2>Access Restricted</h2>
+            <p>
+                This application is only for registered residents of the building.
+                If you are a new resident, please ask the building administrator
+                to add your name and phone number to the contact list.
+            </p>
+            <div class="verification-note">
+                <strong>Note:</strong> Your phone number must be registered in the system
+                to access the application features.
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .verification-message {
+            background-color: #fff;
+            border-radius: 12px;
+            padding: 40px;
+            margin: 80px 20px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .verification-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .verification-message h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .verification-message p {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .verification-note {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin-top: 30px;
+            text-align: left;
+            border-radius: 4px;
+        }
+
+        .verification-note strong {
+            color: #2c3e50;
+        }
+
+        @media (max-width: 480px) {
+            .verification-message {
+                margin: 70px 10px 10px;
+                padding: 30px 20px;
+            }
+
+            .verification-icon {
+                font-size: 48px;
+            }
+
+            .verification-message h2 {
+                font-size: 20px;
+            }
+
+            .verification-message p {
+                font-size: 14px;
+            }
+        }
+    </style>
+</body>
+</html>

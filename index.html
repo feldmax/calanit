@@ -18,11 +18,37 @@
     </div>
 
     <script type="module">
-        import { getParkingData, getResidentsData } from './src/js/data.js';
+        import { getParkingData, getResidentsData, detectDevicePhoneNumber, isPhoneRegistered } from './src/js/data.js';
 
         // Store data globally for navigation
         window.parkingData = null;
         window.residentsData = null;
+
+        /**
+         * Verify user phone against residents list
+         * @returns {Promise<boolean>} True if verification successful
+         */
+        async function verifyUserPhone() {
+            try {
+                // Detect device phone number (or use default for desktop testing)
+                const phone = await detectDevicePhoneNumber();
+
+                // Check if phone is registered
+                const residentsData = await getResidentsData();
+                if (!isPhoneRegistered(phone, residentsData)) {
+                    // Phone not registered - clear stored phone and redirect
+                    localStorage.removeItem('calanit_user_phone');
+                    window.location.href = 'user-verification.html';
+                    return false;
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Phone verification error:', error);
+                window.location.href = 'user-verification.html';
+                return false;
+            }
+        }
 
         /**
          * Get display number from parking ID
@@ -43,12 +69,54 @@
         }
 
         /**
+         * Get parking status from localStorage
+         * @param {string} parkingId - Parking space ID
+         * @returns {string|null} Status: 'occupied', 'free', or null (default)
+         */
+        function getParkingStatus(parkingId) {
+            return localStorage.getItem(`parking_status_${parkingId}`);
+        }
+
+        /**
+         * Apply status color to tile
+         * @param {HTMLElement} tile - Tile element
+         * @param {string} status - Status: 'occupied', 'free', or null
+         */
+        function applyStatusColor(tile, status) {
+            // Remove existing status classes
+            tile.classList.remove('status-occupied', 'status-free', 'status-default');
+
+            // Apply status color
+            if (status === 'occupied') {
+                tile.classList.add('status-occupied');
+            } else if (status === 'free') {
+                tile.classList.add('status-free');
+            } else {
+                tile.classList.add('status-default');
+            }
+        }
+
+        /**
          * Create a parking tile element
          */
         function createParkingTile(parking, isRegular = true) {
             const tile = document.createElement('a');
             tile.className = isRegular ? 'parking-tile' : 'tandem-tile';
-            tile.href = `parking-properties.html?id=${parking.parking_id}`;
+            tile.href = '#'; // Prevent default navigation
+            tile.dataset.parkingId = parking.parking_id;
+
+            // Apply status color
+            const status = getParkingStatus(parking.parking_id);
+            applyStatusColor(tile, status);
+
+            // Add click handler for verification
+            tile.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const verified = await verifyUserPhone();
+                if (verified) {
+                    window.location.href = `parking-properties.html?id=${parking.parking_id}`;
+                }
+            });
 
             const content = document.createElement('div');
             content.className = 'parking-tile-content';
@@ -76,11 +144,26 @@
 
             // Create a wrapper link for both tiles
             const link = document.createElement('a');
-            link.href = `parking-properties.html?id=${parking1.parking_id},${parking2.parking_id}`;
+            link.href = '#'; // Prevent default navigation
             link.style.display = 'contents';
+
+            // Add click handler for verification
+            link.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const verified = await verifyUserPhone();
+                if (verified) {
+                    window.location.href = `parking-properties.html?id=${parking1.parking_id},${parking2.parking_id}`;
+                }
+            });
 
             const tile1 = document.createElement('div');
             tile1.className = 'tandem-tile';
+            tile1.dataset.parkingId = parking1.parking_id;
+
+            // Apply status color to tile1
+            const status1 = getParkingStatus(parking1.parking_id);
+            applyStatusColor(tile1, status1);
+
             const content1 = document.createElement('div');
             content1.className = 'parking-tile-content';
             const number1 = document.createElement('span');
@@ -94,6 +177,12 @@
 
             const tile2 = document.createElement('div');
             tile2.className = 'tandem-tile';
+            tile2.dataset.parkingId = parking2.parking_id;
+
+            // Apply status color to tile2
+            const status2 = getParkingStatus(parking2.parking_id);
+            applyStatusColor(tile2, status2);
+
             const content2 = document.createElement('div');
             content2.className = 'parking-tile-content';
             const number2 = document.createElement('span');
