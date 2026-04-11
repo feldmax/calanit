@@ -83,10 +83,37 @@ body {
     color: #333;
 }
 
+/* Parking tile status colors */
+.parking-tile.status-occupied,
+.tandem-tile.status-occupied {
+    background-color: #ffcccc;
+}
+
+.parking-tile.status-free,
+.tandem-tile.status-free {
+    background-color: #ccffcc;
+}
+
+.parking-tile.status-default,
+.tandem-tile.status-default {
+    background-color: #d3d3d3;
+}
+
 .parking-tile:hover {
     background-color: #c0c0c0;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Status-specific hover states */
+.parking-tile.status-occupied:hover,
+.tandem-tile.status-occupied:hover {
+    background-color: #ffb3b3;
+}
+
+.parking-tile.status-free:hover,
+.tandem-tile.status-free:hover {
+    background-color: #b3ffb3;
 }
 
 .parking-tile-content {
